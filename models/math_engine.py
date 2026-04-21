@@ -1,3 +1,12 @@
+"""
+Módulo de Motor Simbólico Computacional.
+
+Este componente actúa como el núcleo de procesamiento matemático del sistema. Utiliza la 
+librería SymPy para realizar operaciones de cálculo simbólico avanzado, incluyendo 
+simplificación de expresiones, evaluación numérica con sustitución de variables y 
+resolución de ecuaciones algebraicas, transformando entradas textuales en resultados matemáticos precisos.
+"""
+
 import sympy as sp
 import re
 

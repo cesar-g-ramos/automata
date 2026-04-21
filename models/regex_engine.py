@@ -1,3 +1,12 @@
+"""
+Módulo Orquestador de Lenguajes Regulares.
+
+Este archivo coordina el flujo completo para el procesamiento de expresiones regulares. 
+Integra el constructor de Thompson para transformar una Regex en un Autómata Finito 
+No Determinista (AFN) y proporciona la lógica de simulación necesaria para validar 
+cadenas de texto, calculando clausuras épsilon y transiciones de estados activos.
+"""
+
 from models.thompson_builder import ThompsonBuilder
 
 class RegexEngine:

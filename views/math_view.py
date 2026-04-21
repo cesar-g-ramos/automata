@@ -1,3 +1,12 @@
+"""
+Módulo de Interfaz para Análisis Matemático.
+
+Este archivo define la capa de presentación para la herramienta de álgebra. Gestiona la 
+entrada de expresiones del usuario, renderiza resultados en formato LaTeX y visualiza 
+gráficamente la traza del Autómata de Pila mediante diagramas de Graphviz, permitiendo 
+al usuario observar el cambio de estados y el contenido de la pila en tiempo real.
+"""
+
 import streamlit as st
 import sympy as sp
 import pandas as pd

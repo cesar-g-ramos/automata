@@ -1,3 +1,12 @@
+"""
+Módulo de Autómata de Pila (PDA) para Validación Algebraica.
+
+Este archivo implementa la lógica de un Autómata de Pila encargado de validar la estructura 
+sintáctica de expresiones algebraicas. Se encarga de la clasificación de caracteres (tokens), 
+el manejo de transiciones entre estados y el control de agrupadores mediante una pila lógica, 
+garantizando que la expresión sea matemáticamente válida antes de su procesamiento.
+"""
+
 import re
 
 class MathAutomata:

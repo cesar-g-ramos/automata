@@ -1,3 +1,12 @@
+"""
+Módulo de Interfaz para Visualización de AFN.
+
+Encargado de la representación visual del procesamiento de lenguajes regulares. 
+Implementa una interfaz interactiva que permite generar autómatas a partir de Regex, 
+simular la evaluación de cadenas paso a paso y visualizar dinámicamente los estados 
+activos y finales del AFN mediante el uso de grafos dirigidos y controles de navegación.
+"""
+
 import streamlit as st
 import pandas as pd
 from models.regex_engine import RegexEngine

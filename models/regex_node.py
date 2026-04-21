@@ -1,3 +1,12 @@
+"""
+Módulo de Estructura de Datos para Nodos de Autómata.
+
+Define la unidad mínima de un Autómata Finito: el Nodo o Estado. Cada instancia 
+almacena un identificador único y gestiona sus propias transiciones, permitiendo 
+tanto saltos por caracteres específicos como transiciones espontáneas (épsilon). 
+Es la base estructural sobre la cual se construye la red de estados del algoritmo de Thompson.
+"""
+
 class RegexNode:
     """Representa un estado en el autómata de Thompson.
 

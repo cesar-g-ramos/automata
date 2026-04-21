@@ -1,3 +1,12 @@
+"""
+Módulo Constructor del Algoritmo de Thompson.
+
+Implementa las reglas formales del Algoritmo de Thompson para la construcción sistemática 
+de AFNs. Provee métodos estáticos para generar fragmentos de autómata para operaciones 
+básicas, uniones (OR), concatenaciones y cierres (Kleene y Positivo), permitiendo la 
+composición modular de estructuras complejas a partir de expresiones regulares simples.
+"""
+
 from models.regex_node import RegexNode
 
 class ThompsonBuilder:

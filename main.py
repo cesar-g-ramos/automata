@@ -1,3 +1,13 @@
+"""
+Módulo Orquestador - Interfaz de Usuario y Control de Flujo.
+
+Este archivo actúa como el punto de entrada principal (Main Entry Point) utilizando el framework Streamlit. 
+Se encarga de inicializar la configuración de la página, gestionar el estado de la sesión y 
+coordinar la navegación entre las vistas de Análisis Matemático y Lenguajes Regulares. 
+Implementa el patrón de diseño Singleton para el manejo de la aplicación.
+"""
+
+
 import streamlit as st
 from views.math_view import MathView
 from views.regex_view import RegexView

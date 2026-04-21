@@ -1,108 +1,85 @@
 """
-Módulo de Extracción de Metadatos - Generador de Documentación Dinámica.
+Módulo de Introspección y Generación de Metadatos.
 
-Utiliza el módulo ast de Python para realizar una introspección del código fuente.
-Extrae descripciones de módulos, clases y métodos (Docstrings) para generar un
-archivo data.js que alimenta la interfaz visual, garantizando que la documentación
-web esté siempre sincronizada con la lógica del código.
+Este script actúa como un 'parser' de código fuente que utiliza el Abstract Syntax Tree (AST)
+para mapear la arquitectura completa del proyecto. Genera un manifiesto JSON (data.js) 
+que incluye la jerarquía de archivos, diagramas de clases implícitos y la lógica 
+de implementación de cada componente.
 """
 
 import ast
 import json
 import os
-import re
 
 def clean_docstring(doc):
-    """Limpia y formatea el docstring para que sea legible en HTML."""
-    if not doc:
-        return "Sin descripción."
-    
-    # Eliminar espacios en blanco comunes de la indentación de Python
+    if not doc: return "Sin descripción técnica disponible."
     lines = doc.expandtabs().splitlines()
     margin = 2**31 - 1
     for line in lines[1:]:
         content = len(line) - len(line.lstrip())
-        if line.lstrip():
-            margin = min(margin, content)
-    
+        if line.lstrip(): margin = min(margin, content)
     trimmed = [lines[0].strip()]
     if len(lines) > 1:
-        for line in lines[1:]:
-            trimmed.append(line[margin:].rstrip())
-    
-    # Unir y formatear secciones comunes de Google Style
-    full_text = "\n".join(trimmed)
-    
-    # Resaltar secciones clave para el frontend
-    full_text = full_text.replace("Args:", "\n**Argumentos:**")
-    full_text = full_text.replace("Returns:", "\n**Retorna:**")
-    full_text = full_text.replace("Attributes:", "\n**Atributos:**")
-    full_text = full_text.replace("Raises:", "\n**Excepciones:**")
-    
-    return full_text.strip()
+        for line in lines[1:]: trimmed.append(line[margin:].rstrip())
+    return "\n".join(trimmed).replace("Args:", "\n**Argumentos:**").replace("Returns:", "\n**Retorna:**").strip()
 
-def extract_docs(file_path):
-    """Extrae toda la estructura del archivo incluyendo lógica compleja de docstrings."""
-    if not os.path.exists(file_path):
-        return None
-
+def extract_docs(file_path, category):
+    if not os.path.exists(file_path): return None
     with open(file_path, "r", encoding="utf-8") as f:
-        node = ast.parse(f.read())
+        source = f.read()
+        tree = ast.parse(source)
 
-    module_doc = clean_docstring(ast.get_docstring(node))
-    
     module_info = {
         "filename": os.path.basename(file_path),
-        "module_doc": module_doc,
-        "classes": [],
-        "functions": []
+        "path": file_path,
+        "category": category,
+        "module_doc": clean_docstring(ast.get_docstring(tree)),
+        "classes": []
     }
 
-    for item in node.body:
-        if isinstance(item, ast.ClassDef):
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
             class_info = {
-                "name": item.name,
-                "doc": clean_docstring(ast.get_docstring(item)),
-                "methods": []
+                "name": node.name,
+                "doc": clean_docstring(ast.get_docstring(node)),
+                "methods": [],
+                "attributes": []
             }
-            for subitem in item.body:
-                if isinstance(subitem, ast.FunctionDef):
-                    # Incluimos todos los métodos documentados
-                    method_doc = ast.get_docstring(subitem)
-                    if method_doc:
-                        class_info["methods"].append({
-                            "name": subitem.name,
-                            "doc": clean_docstring(method_doc)
-                        })
+            # Intentar extraer atributos del __init__
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef):
+                    if item.name == "__init__":
+                        for stmt in item.body:
+                            if isinstance(stmt, ast.Assign):
+                                for target in stmt.targets:
+                                    if isinstance(target, ast.Attribute):
+                                        class_info["attributes"].append(target.attr)
+                    
+                    start = item.lineno - 1
+                    end = item.end_lineno
+                    class_info["methods"].append({
+                        "name": item.name,
+                        "doc": clean_docstring(ast.get_docstring(item)),
+                        "code": "\n".join(source.splitlines()[start:end])
+                    })
             module_info["classes"].append(class_info)
-        
-        elif isinstance(item, ast.FunctionDef):
-            func_doc = ast.get_docstring(item)
-            if func_doc:
-                module_info["functions"].append({
-                    "name": item.name,
-                    "doc": clean_docstring(func_doc)
-                })
-
     return module_info
 
 def main():
-    files = ["lexer.py", "nodes.py", "parser.py", "main.py"]
-    all_data = []
-
-    print("--- Sincronizando Docstrings con el Proyecto ---")
-    for f in files:
-        data = extract_docs(f)
-        if data:
-            all_data.append(data)
-            print(f"Sincronizado: {f}")
-    
+    config = [
+        ("main.py", "Orquestador"),
+        ("models/math_automata.py", "Modelo"),
+        ("models/math_engine.py", "Modelo"),
+        ("models/regex_engine.py", "Modelo"),
+        ("models/regex_node.py", "Modelo"),
+        ("models/thompson_builder.py", "Modelo"),
+        ("views/math_view.py", "Vista"),
+        ("views/regex_view.py", "Vista")
+    ]
+    all_data = [extract_docs(p, c) for p, c in config if extract_docs(p, c)]
     with open("data.js", "w", encoding="utf-8") as out:
-        out.write("const projectData = ")
-        json.dump(all_data, out, indent=4, ensure_ascii=False)
-        out.write(";")
-    
-    print("\n[COHERENCIA VERIFICADA] data.js generado con éxito.")
+        out.write(f"const projectData = {json.dumps(all_data, indent=4)};")
+    print("🚀 data.js generado con éxito.")
 
 if __name__ == "__main__":
     main()
