@@ -11,6 +11,8 @@ Implementa el patrón de diseño Singleton para el manejo de la aplicación.
 import streamlit as st
 from views.math_view import MathView
 from views.regex_view import RegexView
+from views.stack_interpreter_view import StackInterpreterView
+
 
 class CompilerApp:
     """Orquestador principal de la aplicación."""
@@ -31,14 +33,30 @@ class CompilerApp:
         - **Naranja:** Estados actuales.
         """)
 
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### Intérprete de Pila")
+        st.sidebar.write("""
+        El intérprete convierte código fuente a **instrucciones de código intermedio**
+        y las ejecuta sobre una pila, mostrando cada paso:
+        - `PUSH` → apila un valor literal.
+        - `LOAD` / `STORE` → lee o escribe variables.
+        - `ADD`, `SUB`, `MUL`, `DIV` → opera sobre el tope de la pila.
+        - `JUMP_IF_FALSE` → control de flujo (IF / WHILE).
+        """)
+
     def run(self):
         """Loop principal."""
         st.title("🎓 Laboratorio de Teoría de Compiladores")
         self.show_sidebar()
         
-        tabs = st.tabs(["🧮 Análisis Matemático", "🔍 Lenguajes Regulares"])
+        tabs = st.tabs([
+            "🧮 Análisis Matemático",
+            "🔍 Lenguajes Regulares",
+            "⚙️ Intérprete de Pila",
+        ])
         with tabs[0]: self.math_view.show()
         with tabs[1]: self.regex_view.show()
+        with tabs[2]: self.interpreter_view.show()
 
 if __name__ == "__main__":
     app = CompilerApp()
