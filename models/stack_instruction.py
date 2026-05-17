@@ -1,9 +1,19 @@
+"""
+Módulo de Instrucciones de Código Intermedio para el Intérprete de Pila.
 
+Define el conjunto de operaciones (OpCode) que el StackCompiler genera
+y el StackInterpreter ejecuta. Cada Instruction agrupa un OpCode con su
+operando opcional, representando la unidad mínima de ejecución del
+lenguaje intermedio basado en pila.
+"""
 
 from enum import Enum, auto
 from typing import Any
-Class opCode(enum):
+
+
+class OpCode(Enum):
     """Conjunto de instrucciones del lenguaje intermedio de pila."""
+
     # ── Pila ────────────────────────────────────────────────────────────
     PUSH  = auto()   # PUSH <valor>    → apila un literal numérico
     POP   = auto()   # POP             → desapila y descarta el tope
@@ -34,6 +44,7 @@ Class opCode(enum):
     LABEL = auto()   # LABEL <nombre>  → marca de posición para saltos
 
 
+
 # Representación legible de cada opcode para la traza visual
 OPCODE_LABELS: dict[OpCode, str] = {
     OpCode.PUSH:          "PUSH",
@@ -54,7 +65,6 @@ OPCODE_LABELS: dict[OpCode, str] = {
     OpCode.JUMP_IF_FALSE: "JUMP_IF_FALSE",
     OpCode.LABEL:         "LABEL",
 }
-
 
 
 class Instruction:

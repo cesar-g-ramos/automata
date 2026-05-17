@@ -7,6 +7,8 @@ el código fuente del lenguaje simple. Cada Token encapsula su tipo
 mensajes de error precisos y la trazabilidad durante la compilación.
 """
 
+from enum import Enum, auto
+
 
 class TokenType(Enum):
     """Enumeración de todos los tipos de token del lenguaje."""

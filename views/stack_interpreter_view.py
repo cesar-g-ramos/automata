@@ -1,269 +1,302 @@
 """
-Módulo Intérprete de Pila (StackInterpreter).
+Módulo de Interfaz para el Intérprete Basado en Pila.
 
-Ejecuta la lista de Instrucciones generadas por el StackCompiler,
-manteniendo la pila de ejecución (Stack) y la memoria de variables
-(dict). Produce un ExecutionStep por cada instrucción ejecutada,
-permitiendo a la vista reproducir la traza paso a paso de forma
-completamente desacoplada del motor de ejecución.
+Define la capa de presentación del intérprete de lenguaje simple.
+Gestiona la entrada de código fuente, orquesta la compilación y
+ejecución, y renderiza la traza paso a paso de forma visual e
+interactiva mediante Streamlit: pila animada, memoria de variables,
+código intermedio generado y navegación por botones.
 """
 
-from typing import Any
-from models.stack_instruction import Instruction, OpCode
-from models.stack_structure import Stack, StackUnderflowError
+import streamlit as st
+import pandas as pd
+
+from models.stack_compiler import StackCompiler, CompilerError
+from models.stack_lexer import LexerError
+from models.stack_interpreter import StackInterpreter, ExecutionStep
+from models.stack_instruction import OpCode
 
 
-class InterpreterError(Exception):
-    """Excepción en tiempo de ejecución del intérprete."""
-    pass
+# ── Código de ejemplo que se muestra al cargar la vista ──────────────── #
+_EXAMPLE_BASIC = """\
+x = 5
+y = x + 3
+z = y * 2
+"""
+
+_EXAMPLE_IF = """\
+a = 10
+b = 4
+if (a > b) {
+    resultado = a - b
+} else {
+    resultado = b - a
+}
+"""
+
+_EXAMPLE_WHILE = """\
+n = 1
+acum = 0
+while (n <= 5) {
+    acum = acum + n
+    n = n + 1
+}
+"""
+
+_EXAMPLES = {
+    "📦 Variables y aritmética": _EXAMPLE_BASIC,
+    "🔀 Condicional IF / ELSE":  _EXAMPLE_IF,
+    "🔁 Ciclo WHILE":            _EXAMPLE_WHILE,
+}
 
 
-class ExecutionStep:
-    """Instantánea del estado de la máquina tras ejecutar una instrucción.
+class StackInterpreterView:
+    """Vista del intérprete de pila con navegación paso a paso.
 
-    Attributes:
-        step_num         (int):         Número de paso (base 0).
-        instruction      (Instruction): Instrucción que se acaba de ejecutar.
-        stack_snapshot   (list):        Copia del contenido de la pila.
-        memory_snapshot  (dict):        Copia del mapa de variables.
-        result           (Any):         Valor calculado si aplica, None si no.
-        error            (str | None):  Mensaje de error si hubo excepción.
+    Reutiliza el mismo patrón de navegación por botones (⬅️ / ➡️)
+    que MathView y RegexView, manteniendo consistencia visual.
     """
-
-    def __init__(
-        self,
-        step_num: int,
-        instruction: Instruction,
-        stack_snapshot: list[Any],
-        memory_snapshot: dict[str, Any],
-        result: Any = None,
-        error: str | None = None,
-    ):
-        self.step_num        = step_num
-        self.instruction     = instruction
-        self.stack_snapshot  = stack_snapshot
-        self.memory_snapshot = memory_snapshot
-        self.result          = result
-        self.error           = error
-
-    def describe(self) -> str:
-        """Descripción en lenguaje natural del paso para el usuario.
-
-        Returns:
-            str: Frase explicativa de la operación realizada.
-        """
-        op = self.instruction.opcode
-        arg = self.instruction.operand
-
-        descriptions = {
-            OpCode.PUSH:          f"Se apila el valor {arg}",
-            OpCode.POP:           "Se descarta el valor del tope",
-            OpCode.LOAD:          f"Se carga la variable '{arg}' → {self.result}",
-            OpCode.STORE:         f"Se guarda el tope en la variable '{arg}'",
-            OpCode.ADD:           f"Se suma: resultado = {self.result}",
-            OpCode.SUB:           f"Se resta: resultado = {self.result}",
-            OpCode.MUL:           f"Se multiplica: resultado = {self.result}",
-            OpCode.DIV:           f"Se divide: resultado = {self.result}",
-            OpCode.CMP_EQ:        f"Comparación ==: {'verdadero' if self.result else 'falso'}",
-            OpCode.CMP_NEQ:       f"Comparación !=: {'verdadero' if self.result else 'falso'}",
-            OpCode.CMP_LT:        f"Comparación <:  {'verdadero' if self.result else 'falso'}",
-            OpCode.CMP_GT:        f"Comparación >:  {'verdadero' if self.result else 'falso'}",
-            OpCode.CMP_LTE:       f"Comparación <=: {'verdadero' if self.result else 'falso'}",
-            OpCode.CMP_GTE:       f"Comparación >=: {'verdadero' if self.result else 'falso'}",
-            OpCode.JUMP:          f"Salto incondicional → {arg}",
-            OpCode.JUMP_IF_FALSE: f"Condición {'falsa → salta' if self.result == 'jumped' else 'verdadera → continúa'} ({arg})",
-            OpCode.LABEL:         f"Etiqueta '{arg}' alcanzada",
-        }
-
-        if self.error:
-            return f"Error: {self.error}"
-        return descriptions.get(op, repr(self.instruction))
-
-
-class StackInterpreter:
-    """Intérprete de instrucciones de pila con ejecución paso a paso.
-
-    Attributes:
-        _stack        (Stack):              Pila de ejecución.
-        _memory       (dict[str, Any]):     Memoria de variables.
-        _instructions (list[Instruction]):  Programa cargado.
-        _ip           (int):               Puntero de instrucción actual.
-        _label_map    (dict[str, int]):    Mapa de etiqueta → índice.
-    """
-
-    MAX_STEPS = 1000   # Límite de seguridad para ciclos infinitos
 
     def __init__(self):
-        """Inicializa el intérprete en estado limpio."""
-        self._stack:        Stack                  = Stack()
-        self._memory:       dict[str, Any]         = {}
-        self._instructions: list[Instruction]      = []
-        self._ip:           int                    = 0
-        self._label_map:    dict[str, int]         = {}
+        """Inicializa el compilador, el intérprete y el estado de sesión."""
+        self._compiler    = StackCompiler()
+        self._interpreter = StackInterpreter()
+
+        # Estado de sesión propio del módulo (prefijo 'si_' para no colisionar)
+        defaults = {
+            "si_steps":       [],     # lista de ExecutionStep
+            "si_step_idx":    0,      # paso actual en la navegación
+            "si_bytecode":    [],     # instrucciones generadas
+            "si_last_source": "",     # cache para detectar cambios
+            "si_error":       None,   # mensaje de error de compilación
+        }
+        for key, value in defaults.items():
+            if key not in st.session_state:
+                st.session_state[key] = value
 
     # ------------------------------------------------------------------ #
-    # Interfaz pública                                                     #
+    # Punto de entrada llamado por CompilerApp                            #
     # ------------------------------------------------------------------ #
 
-    def run(self, instructions: list[Instruction]) -> list[ExecutionStep]:
-        """Ejecuta el programa completo y retorna todos los pasos.
+    def show(self) -> None:
+        """Renderiza la UI completa del intérprete."""
+        self._render_header()
 
-        Args:
-            instructions: Lista de instrucciones generada por StackCompiler.
+        col_left, col_right = st.columns([1.1, 1])
 
-        Returns:
-            list[ExecutionStep]: Traza completa de la ejecución.
-        """
-        self.reset()
-        self._instructions = instructions
-        self._build_label_map()
+        with col_left:
+            self._render_editor()
 
-        steps: list[ExecutionStep] = []
-        guard = 0
+        with col_right:
+            self._render_trace_panel()
 
-        while self._ip < len(self._instructions):
-            guard += 1
-            if guard > self.MAX_STEPS:
-                steps.append(ExecutionStep(
-                    step_num=len(steps),
-                    instruction=self._instructions[self._ip],
-                    stack_snapshot=self._stack.snapshot(),
-                    memory_snapshot=dict(self._memory),
-                    error=f"Límite de {self.MAX_STEPS} pasos alcanzado. ¿Ciclo infinito?",
-                ))
-                break
+    # ------------------------------------------------------------------ #
+    # Secciones de la UI                                                   #
+    # ------------------------------------------------------------------ #
 
-            step = self.step()
-            steps.append(step)
-            if step.error:
-                break
-
-        return steps
-
-    def step(self) -> ExecutionStep:
-        """Ejecuta la instrucción actual y avanza el puntero.
-
-        Returns:
-            ExecutionStep: Estado tras la ejecución de la instrucción.
-        """
-        instr  = self._instructions[self._ip]
-        result = None
-        error  = None
-
-        try:
-            result = self._execute(instr)
-        except (StackUnderflowError, InterpreterError, ZeroDivisionError) as exc:
-            error = str(exc)
-
-        step = ExecutionStep(
-            step_num=self._ip,
-            instruction=instr,
-            stack_snapshot=self._stack.snapshot(),
-            memory_snapshot=dict(self._memory),
-            result=result,
-            error=error,
+    def _render_header(self) -> None:
+        """Encabezado con descripción breve y selector de ejemplos."""
+        st.markdown(
+            "Escribe código fuente en el editor, compílalo y observa "
+            "cómo el intérprete lo ejecuta **instrucción por instrucción** "
+            "sobre la pila."
         )
 
-        if not error:
-            self._ip += 1
+        example_key = st.selectbox(
+            "Cargar ejemplo:",
+            options=list(_EXAMPLES.keys()),
+            key="si_example_select",
+        )
+        if st.button("📂 Cargar ejemplo", key="si_load_example"):
+            st.session_state["si_source_input"] = _EXAMPLES[example_key]
+            # Reiniciar estado al cargar un ejemplo nuevo
+            self._reset_state()
 
-        return step
+    def _render_editor(self) -> None:
+        """Panel izquierdo: editor de código + código intermedio."""
+        st.subheader("✏️ Editor de código")
 
-    def reset(self) -> None:
-        """Reinicia el intérprete a estado inicial."""
-        self._stack        = Stack()
-        self._memory       = {}
-        self._instructions = []
-        self._ip           = 0
-        self._label_map    = {}
+        source = st.text_area(
+            "Código fuente:",
+            height=200,
+            key="si_source_input",
+            placeholder="x = 5\ny = x + 3\n",
+        )
+
+        col_compile, col_clear = st.columns([2, 1])
+        with col_compile:
+            compile_btn = st.button("▶ Compilar y ejecutar", key="si_compile_btn",
+                                    type="primary")
+        with col_clear:
+            if st.button("🗑 Limpiar", key="si_clear_btn"):
+                self._reset_state()
+                st.rerun()
+
+        if compile_btn and source.strip():
+            self._compile_and_run(source)
+
+        # Muestra el código intermedio generado
+        if st.session_state["si_error"]:
+            st.error(f"⚠️ {st.session_state['si_error']}")
+
+        elif st.session_state["si_bytecode"]:
+            st.subheader("🔢 Código intermedio generado")
+            self._render_bytecode_table()
+
+    def _render_trace_panel(self) -> None:
+        """Panel derecho: navegación paso a paso, pila y memoria."""
+        steps: list[ExecutionStep] = st.session_state["si_steps"]
+
+        if not steps:
+            st.info("💡 Escribe código y presiona **Compilar y ejecutar** para ver la traza.")
+            return
+
+        st.subheader("⚙️ Traza de ejecución")
+
+        # ── Controles de navegación ──────────────────────────────────── #
+        max_idx = len(steps) - 1
+        idx     = st.session_state["si_step_idx"]
+
+        nav_l, nav_info, nav_r = st.columns([1, 3, 1])
+
+        if nav_l.button("⬅️", key="si_prev") and idx > 0:
+            st.session_state["si_step_idx"] -= 1
+            idx -= 1
+
+        if nav_r.button("➡️", key="si_next") and idx < max_idx:
+            st.session_state["si_step_idx"] += 1
+            idx += 1
+
+        nav_info.markdown(
+            f"<div style='text-align:center;padding-top:8px'>"
+            f"Paso <b>{idx + 1}</b> de <b>{max_idx + 1}</b>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        current: ExecutionStep = steps[idx]
+
+        # ── Instrucción actual ───────────────────────────────────────── #
+        instr_color = "#ffcccc" if current.error else "#d4edda"
+        st.markdown(
+            f"<div style='background:{instr_color};padding:10px;"
+            f"border-radius:8px;font-family:monospace;font-size:15px'>"
+            f"<b>Instrucción:</b>  {current.instruction}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        # ── Descripción en lenguaje natural ──────────────────────────── #
+        st.caption(current.describe())
+
+        if current.error:
+            st.error(f"Error en ejecución: {current.error}")
+            return
+
+        # ── Visualización de la pila ─────────────────────────────────── #
+        st.markdown("**🥞 Estado de la pila** *(tope arriba)*")
+        self._render_stack_visual(current.stack_snapshot)
+
+        # ── Memoria de variables ─────────────────────────────────────── #
+        st.markdown("**🗄️ Memoria de variables**")
+        self._render_memory_table(current.memory_snapshot)
 
     # ------------------------------------------------------------------ #
-    # Lógica de ejecución por opcode                                      #
+    # Renderizado de sub-componentes                                       #
     # ------------------------------------------------------------------ #
 
-    def _build_label_map(self) -> None:
-        """Precompila el mapa etiqueta → índice para saltos O(1)."""
-        self._label_map = {}
-        for idx, instr in enumerate(self._instructions):
-            if instr.opcode == OpCode.LABEL:
-                self._label_map[instr.operand] = idx
+    def _render_bytecode_table(self) -> None:
+        """Tabla del código intermedio con el paso actual resaltado."""
+        bytecode = st.session_state["si_bytecode"]
+        idx      = st.session_state["si_step_idx"]
+        steps    = st.session_state["si_steps"]
 
-    def _execute(self, instr: Instruction) -> Any:
-        """Despacha la instrucción a su manejador; retorna valor relevante."""
-        op  = instr.opcode
-        arg = instr.operand
+        # Índice de la instrucción actual en el bytecode
+        current_instr_idx = steps[idx].step_num if steps else -1
 
-        # ── Pila ────────────────────────────────────────────────────────
-        if op == OpCode.PUSH:
-            self._stack.push(arg)
-            return arg
+        rows = []
+        for i, instr in enumerate(bytecode):
+            marker = "▶" if i == current_instr_idx else ""
+            rows.append({
+                " ": marker,
+                "#": i,
+                "Opcode":   instr.opcode.name,
+                "Operando": str(instr.operand) if instr.operand is not None else "",
+            })
 
-        if op == OpCode.POP:
-            return self._stack.pop()
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True, height=220)
 
-        # ── Memoria ─────────────────────────────────────────────────────
-        if op == OpCode.LOAD:
-            if arg not in self._memory:
-                raise InterpreterError(
-                    f"Variable '{arg}' no definida. "
-                    "Asígnala antes de usarla."
-                )
-            value = self._memory[arg]
-            self._stack.push(value)
-            return value
+    def _render_stack_visual(self, snapshot: list) -> None:
+        """Renderiza la pila como celdas apiladas (tope arriba)."""
+        if not snapshot:
+            st.markdown(
+                "<div style='text-align:center;color:gray;font-style:italic;"
+                "padding:16px;border:1px dashed #ccc;border-radius:8px'>"
+                "Pila vacía"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            return
 
-        if op == OpCode.STORE:
-            value = self._stack.pop()
-            self._memory[arg] = value
-            return value
+        # Renderizamos de arriba (tope) hacia abajo (fondo)
+        reversed_snap = list(reversed(snapshot))
+        html_cells = ""
+        for i, val in enumerate(reversed_snap):
+            is_top     = (i == 0)
+            bg_color   = "#1a7a4a" if is_top else "#2e9c6a"
+            text_color = "#ffffff"
+            border     = "3px solid #0d5c37" if is_top else "1px solid #1a7a4a"
+            label      = " ← tope" if is_top else ""
+            html_cells += (
+                f"<div style='background:{bg_color};color:{text_color};"
+                f"border:{border};padding:8px 16px;margin:2px 0;"
+                f"border-radius:6px;font-family:monospace;font-size:14px;"
+                f"display:flex;justify-content:space-between'>"
+                f"<span>{val}</span>"
+                f"<span style='opacity:0.7;font-size:12px'>{label}</span>"
+                f"</div>"
+            )
 
-        # ── Aritmética ───────────────────────────────────────────────────
-        if op in (OpCode.ADD, OpCode.SUB, OpCode.MUL, OpCode.DIV):
-            b = self._stack.pop()
-            a = self._stack.pop()
-            if op == OpCode.ADD: res = a + b
-            elif op == OpCode.SUB: res = a - b
-            elif op == OpCode.MUL: res = a * b
-            else:
-                if b == 0:
-                    raise InterpreterError("División por cero.")
-                res = a / b
-                # Convertir a entero si el resultado es exacto
-                if isinstance(res, float) and res.is_integer():
-                    res = int(res)
-            self._stack.push(res)
-            return res
+        st.markdown(
+            f"<div style='border:1px solid #ccc;border-radius:8px;"
+            f"padding:8px;max-height:200px;overflow-y:auto'>{html_cells}</div>",
+            unsafe_allow_html=True,
+        )
 
-        # ── Comparación ─────────────────────────────────────────────────
-        cmp_ops = {
-            OpCode.CMP_EQ:  lambda a, b: a == b,
-            OpCode.CMP_NEQ: lambda a, b: a != b,
-            OpCode.CMP_LT:  lambda a, b: a <  b,
-            OpCode.CMP_GT:  lambda a, b: a >  b,
-            OpCode.CMP_LTE: lambda a, b: a <= b,
-            OpCode.CMP_GTE: lambda a, b: a >= b,
-        }
-        if op in cmp_ops:
-            b = self._stack.pop()
-            a = self._stack.pop()
-            res = 1 if cmp_ops[op](a, b) else 0
-            self._stack.push(res)
-            return res
+    def _render_memory_table(self, memory: dict) -> None:
+        """Tabla de variables con nombre y valor actual."""
+        if not memory:
+            st.caption("Sin variables definidas aún.")
+            return
 
-        # ── Saltos ───────────────────────────────────────────────────────
-        if op == OpCode.JUMP:
-            self._ip = self._label_map[arg] - 1  # -1 porque step() sumará 1
-            return f"→ {arg}"
+        df = pd.DataFrame(
+            [{"Variable": k, "Valor": v} for k, v in memory.items()]
+        )
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
-        if op == OpCode.JUMP_IF_FALSE:
-            cond = self._stack.pop()
-            if not cond:
-                self._ip = self._label_map[arg] - 1
-                return "jumped"
-            return "continue"
+    # ------------------------------------------------------------------ #
+    # Compilación y ejecución                                              #
+    # ------------------------------------------------------------------ #
 
-        # ── Etiquetas ────────────────────────────────────────────────────
-        if op == OpCode.LABEL:
-            return f"[{arg}]"   # sin efecto en ejecución; solo marcador
+    def _compile_and_run(self, source: str) -> None:
+        """Compila el fuente, ejecuta el intérprete y guarda la traza."""
+        self._reset_state()
 
-        raise InterpreterError(f"OpCode desconocido: {op}")
+        try:
+            bytecode = self._compiler.compile(source)
+            st.session_state["si_bytecode"] = bytecode
+        except (LexerError, CompilerError) as exc:
+            st.session_state["si_error"] = str(exc)
+            return
+
+        steps = self._interpreter.run(bytecode)
+        st.session_state["si_steps"]       = steps
+        st.session_state["si_last_source"] = source
+
+    def _reset_state(self) -> None:
+        """Reinicia el estado de ejecución sin tocar el editor."""
+        st.session_state["si_steps"]    = []
+        st.session_state["si_step_idx"] = 0
+        st.session_state["si_bytecode"] = []
+        st.session_state["si_error"]    = None

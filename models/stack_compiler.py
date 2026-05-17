@@ -24,9 +24,11 @@ from models.stack_token import Token, TokenType
 from models.stack_lexer import Lexer, LexerError
 from models.stack_instruction import Instruction, OpCode
 
+
 class CompilerError(Exception):
     """Excepción lanzada ante errores sintácticos durante la compilación."""
     pass
+
 
 class StackCompiler:
     """Compilador de código fuente a instrucciones de pila.
