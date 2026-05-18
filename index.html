@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compiler Architecture | Lab</title>
+    <title>Automata Lab | Documentación de Arquitectura</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -25,7 +25,7 @@
             <div class="w-10 h-10 bg-sky-500 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/20">
                 <i class="fas fa-terminal text-white"></i>
             </div>
-            <span class="text-xl font-black tracking-tighter uppercase text-white">Compiler<span class="text-sky-500">.Lab</span></span>
+            <span class="text-xl font-black tracking-tighter uppercase text-white">Automata<span class="text-sky-500">.Lab</span></span>
         </div>
         <div class="flex gap-8 text-xs font-bold uppercase tracking-widest">
             <a href="#architecture" class="hover:text-sky-400 transition">Arquitectura</a>
@@ -41,8 +41,8 @@
         <section id="architecture" class="space-y-8 animate-in fade-in duration-1000">
             <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h2 class="text-5xl font-black text-white tracking-tighter italic">Arquitectura de Clases</h2>
-                    <p class="text-slate-500 mt-2">Plano estructural del sistema: Atributos, Métodos y Jerarquía.</p>
+                    <h2 class="text-5xl font-black text-white tracking-tighter italic">Diagrama de Clases</h2>
+                    <p class="text-slate-500 mt-2">Arquitectura completa del sistema: Autómatas, Regex, Intérprete de Pila y subsistemas de soporte.</p>
                 </div>
                 <!-- Controles del Diagrama -->
                 <div class="flex gap-2 bg-slate-900/50 p-2 rounded-2xl border border-white/5">
@@ -61,7 +61,7 @@
             <!-- Contenedor del Plano -->
             <div class="relative group">
                 <div class="absolute inset-0 bg-sky-500/5 rounded-[3rem] blur-3xl group-hover:bg-sky-500/10 transition-all duration-700"></div>
-                <div class="glass rounded-[3rem] p-4 overflow-hidden relative border-white/10 h-[600px] cursor-grab active:cursor-grabbing" id="diagram-viewport">
+                <div class="glass rounded-[3rem] p-4 overflow-hidden relative border-white/10 h-[800px] cursor-grab active:cursor-grabbing" id="diagram-viewport">
                     <!-- Fondo de Rejilla Técnica -->
                     <div class="absolute inset-0 opacity-10 pointer-events-none" 
                         style="background-image: radial-gradient(#38bdf8 1px, transparent 1px); background-size: 30px 30px;"></div>
@@ -106,8 +106,8 @@
         <!-- 3. SECCIÓN SIMULACIÓN (Proceso Iterativo) -->
         <section id="simulation" class="space-y-8 pb-32">
             <div class="text-center">
-                <h2 class="text-4xl font-black text-white mb-2 italic">Simulación de Proceso</h2>
-                <p class="text-slate-500">Flujo de datos desde la entrada hasta la resolución.</p>
+                <h2 class="text-4xl font-black text-white mb-2 italic">Flujo de Ejecución</h2>
+                <p class="text-slate-500">Ciclo de vida de los datos: desde la entrada hasta la visualización del resultado.</p>
             </div>
             <div class="glass rounded-3xl p-10 relative">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-8" id="simulation-flow">

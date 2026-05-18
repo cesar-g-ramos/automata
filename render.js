@@ -1,14 +1,18 @@
 /**
- * Motor de Renderizado para Laboratorio de Compiladores.
- * Gestiona la generación de diagramas, el explorador interactivo y la simulación de flujo.
+ * Motor de Renderizado para Laboratorio de Autómatas y Compiladores.
+ * Gestiona la generación del diagrama de clases (Mermaid.js), el explorador
+ * interactivo de archivos y la simulación de flujo del sistema.
+ *
+ * Diagrama de clases: representación estática fiel al diseño arquitectónico
+ * del proyecto, incluyendo los módulos del Intérprete de Pila incorporados
+ * en la versión actual.
  */
 
 const UI = {
     currentZoom: 1,
 
-    // Configuración y Renderizado del Diagrama
+    // ── Diagrama de Clases (Mermaid.js estático) ─────────────────────────
     renderDiagram: () => {
-        // Estilo personalizado para Mermaid que coincida con el proyecto
         mermaid.initialize({
             startOnLoad: false,
             theme: 'base',
@@ -20,37 +24,180 @@ const UI = {
                 secondaryColor: '#1e293b',
                 tertiaryColor: '#020617',
                 fontFamily: 'Inter',
-                fontSize: '14px'
+                fontSize: '13px',
+                classText: '#f8fafc'
             }
         });
 
-        let graph = "classDiagram\n";
-        // Definición de Clases
-        projectData.forEach(mod => {
-            mod.classes.forEach(cls => {
-                graph += `    class ${cls.name} {\n`;
-                cls.attributes.forEach(attr => graph += `        +${attr}\n`);
-                cls.methods.forEach(meth => graph += `        +${meth.name}()\n`);
-                graph += "    }\n";
-            });
-        });
+        // Diagrama de clases completo — refleja la arquitectura real del proyecto.
+        // Incluye: Orquestador, Vistas MVC, Modelos de Autómatas/Regex y el
+        // subsistema del Intérprete de Pila (Lexer, Compiler, Interpreter, Stack).
+        const graph = `classDiagram
+    %% ── Orquestador ──────────────────────────────────────────────────────
+    class CompilerApp {
+        +math_view : MathView
+        +regex_view : RegexView
+        +interpreter_view : StackInterpreterView
+        +run()
+        +show_sidebar()
+    }
 
-        // Relaciones sugeridas (opcional, para conectar vistas y motores)
-        graph += "    MathView ..> MathEngine : Usa\n";
-        graph += "    MathView ..> MathAutomata : Valida\n";
-        graph += "    RegexView ..> RegexEngine : Usa\n";
-        graph += "    RegexEngine ..> ThompsonBuilder : Construye\n";
+    %% ── Vistas ───────────────────────────────────────────────────────────
+    class MathView {
+        -automata : MathAutomata
+        -engine : MathEngine
+        +show()
+        +generate_graphviz()
+    }
+    class RegexView {
+        -engine : RegexEngine
+        +show()
+        +render_afn()
+    }
+    class StackInterpreterView {
+        -interpreter : StackInterpreter
+        -compiler : StackCompiler
+        +show()
+        +render_step_trace()
+    }
+
+    %% ── Modelos: Autómatas y Expresiones Regulares ───────────────────────
+    class MathAutomata {
+        -transitions : dict
+        -estados_aceptacion : list
+        +validate()
+        +get_char_type()
+        +process_to_tuples()
+    }
+    class MathEngine {
+        +prepare_for_sympy()
+        +solve_symbolic()
+        -_format_solutions()
+    }
+    class RegexEngine {
+        -builder : ThompsonBuilder
+        +parse_regex_to_afn()
+        +simulate_afn()
+        +get_epsilon_closure()
+    }
+
+    %% ── Modelos: Intérprete de Pila ──────────────────────────────────────
+    class StackInterpreter {
+        -stack : Stack
+        -memory : dict
+        -instructions : list
+        -ip : int
+        +run(instructions)
+        +step()
+        +reset()
+    }
+    class StackCompiler {
+        -lexer : Lexer
+        -tokens : list
+        -pos : int
+        +compile(src)
+        -_parse_assign()
+        -_parse_expr()
+        -_parse_condition()
+        -_parse_if()
+        -_parse_while()
+    }
+    class Lexer {
+        -source : str
+        -pos : int
+        +tokenize()
+        -_next_token()
+    }
+    class Stack {
+        -_data : list
+        +push(value)
+        +pop()
+        +peek()
+        +is_empty()
+        +snapshot()
+    }
+    class ExecutionStep {
+        +step_num : int
+        +instruction : Instruction
+        +stack_snapshot : list
+        +memory_snapshot : dict
+        +describe()
+    }
+    class Instruction {
+        +opcode : OpCode
+        +operand : Any
+        +__repr__()
+    }
+    class Token {
+        +type : TokenType
+        +value : str
+        +line : int
+        +__repr__()
+    }
+    class OpCode {
+        <<enumeration>>
+        PUSH
+        POP
+        LOAD
+        STORE
+        ADD
+        SUB
+        MUL
+        DIV
+        JUMP_IF_FALSE
+        JUMP
+        LABEL
+    }
+    class TokenType {
+        <<enumeration>>
+        NUMBER
+        IDENTIFIER
+        ASSIGN
+        OPERATOR
+        IF
+        ELSE
+        WHILE
+        LPAREN
+        RPAREN
+        EOF
+    }
+
+    %% ── Relaciones: Orquestador → Vistas ─────────────────────────────────
+    CompilerApp ..> MathView             : crea
+    CompilerApp ..> RegexView            : crea
+    CompilerApp ..> StackInterpreterView : crea
+
+    %% ── Relaciones: Vistas → Modelos ─────────────────────────────────────
+    MathView ..> MathAutomata            : usa
+    MathView ..> MathEngine              : usa
+    RegexView ..> RegexEngine            : usa
+
+    %% ── Relaciones: StackInterpreterView → Stack subsistema ──────────────
+    StackInterpreterView --> StackInterpreter : compone
+    StackInterpreterView --> StackCompiler    : compone
+
+    %% ── Relaciones internas del Intérprete de Pila ───────────────────────
+    StackInterpreter --> Stack            : compone
+    StackInterpreter ..> ExecutionStep   : crea
+    StackInterpreter ..> Instruction     : lee
+    StackCompiler    --> Lexer            : compone
+    StackCompiler    ..> Instruction     : crea
+    ExecutionStep    --> Instruction     : referencia
+    Lexer            ..> Token           : crea
+    Token            --> TokenType       : usa
+    Instruction      --> OpCode          : usa`;
 
         const element = document.getElementById('mermaid-diagram');
-        
-        // Renderizado manual para mejor control
+
         mermaid.render('prepared-diagram', graph).then(({ svg }) => {
             element.innerHTML = svg;
-            // Ajustar el SVG para que sea responsivo
             const svgEl = element.querySelector('svg');
             svgEl.style.width = '100%';
             svgEl.style.height = 'auto';
             UI.initPanZoom();
+        }).catch(err => {
+            console.error('Mermaid render error:', err);
+            element.innerHTML = `<p class="text-red-400 p-4">Error al renderizar el diagrama: ${err.message}</p>`;
         });
     },
 
@@ -155,14 +302,14 @@ const UI = {
         `;
     },
 
-    // Simulación de Proceso Iterativo
+    // ── Simulación de Proceso Iterativo ──────────────────────────────────
     renderSimulation: () => {
         const steps = [
-            { name: "Entrada Usuario", icon: "fa-keyboard", desc: "main.py inicia el loop de Streamlit y captura la expresión.", color: "text-white" },
-            { name: "Controlador", icon: "fa-route", desc: "CompilerApp delega a MathView o RegexView según la pestaña.", color: "text-sky-500" },
-            { name: "Procesamiento", icon: "fa-gears", desc: "MathEngine o RegexEngine procesan la lógica usando SymPy o Thompson.", color: "text-amber-500" },
-            { name: "Validación", icon: "fa-vial", desc: "MathAutomata valida la sintaxis mediante estados de pila.", color: "text-purple-500" },
-            { name: "Resultado", icon: "fa-check-double", desc: "La Vista renderiza los grafos y soluciones finales.", color: "text-emerald-500" }
+            { name: "Entrada Usuario", icon: "fa-keyboard",      desc: "main.py inicia el loop de Streamlit y captura la expresión o el código fuente.", color: "text-white" },
+            { name: "Controlador",     icon: "fa-route",          desc: "CompilerApp delega a MathView, RegexView o StackInterpreterView según la pestaña activa.", color: "text-sky-500" },
+            { name: "Compilación",     icon: "fa-code",           desc: "StackCompiler invoca al Lexer para tokenizar y genera instrucciones de código intermedio (OpCode).", color: "text-amber-500" },
+            { name: "Ejecución",       icon: "fa-gears",          desc: "StackInterpreter ejecuta las instrucciones sobre la pila, produciendo un ExecutionStep por cada paso.", color: "text-purple-500" },
+            { name: "Resultado",       icon: "fa-check-double",   desc: "La Vista renderiza la traza de pila, la memoria de variables y los grafos de autómatas.", color: "text-emerald-500" }
         ];
 
         const container = document.getElementById('simulation-flow');

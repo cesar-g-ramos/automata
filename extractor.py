@@ -5,6 +5,13 @@ Este script actúa como un 'parser' de código fuente que utiliza el Abstract Sy
 para mapear la arquitectura completa del proyecto. Genera un manifiesto JSON (data.js) 
 que incluye la jerarquía de archivos, diagramas de clases implícitos y la lógica 
 de implementación de cada componente.
+
+Módulos analizados:
+    Orquestador : main.py
+    Modelos     : math_automata, math_engine, regex_engine, regex_node, thompson_builder,
+                  stack_token, stack_lexer, stack_instruction, stack_structure,
+                  stack_compiler, stack_interpreter
+    Vistas      : math_view, regex_view, stack_interpreter_view
 """
 
 import ast
@@ -68,13 +75,23 @@ def extract_docs(file_path, category):
 def main():
     config = [
         ("main.py", "Orquestador"),
+        # ── Modelos: autómatas y expresiones regulares ──────────────── #
         ("models/math_automata.py", "Modelo"),
         ("models/math_engine.py", "Modelo"),
         ("models/regex_engine.py", "Modelo"),
         ("models/regex_node.py", "Modelo"),
         ("models/thompson_builder.py", "Modelo"),
+        # ── Modelos: intérprete de pila ─────────────────────────────── #
+        ("models/stack_token.py", "Modelo"),
+        ("models/stack_lexer.py", "Modelo"),
+        ("models/stack_instruction.py", "Modelo"),
+        ("models/stack_structure.py", "Modelo"),
+        ("models/stack_compiler.py", "Modelo"),
+        ("models/stack_interpreter.py", "Modelo"),
+        # ── Vistas ──────────────────────────────────────────────────── #
         ("views/math_view.py", "Vista"),
-        ("views/regex_view.py", "Vista")
+        ("views/regex_view.py", "Vista"),
+        ("views/stack_interpreter_view.py", "Vista"),
     ]
     all_data = [extract_docs(p, c) for p, c in config if extract_docs(p, c)]
     with open("data.js", "w", encoding="utf-8") as out:
