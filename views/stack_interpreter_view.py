@@ -5,7 +5,7 @@ Define la capa de presentación del intérprete de lenguaje simple.
 Gestiona la entrada de código fuente, orquesta la compilación y
 ejecución, y renderiza la traza paso a paso de forma visual e
 interactiva mediante Streamlit: pila animada, memoria de variables,
-código intermedio generado y navegación por botones.
+código intermedio generado y navegación enriquecida.
 """
 
 import streamlit as st
@@ -15,6 +15,7 @@ from models.stack_compiler import StackCompiler, CompilerError
 from models.stack_lexer import LexerError
 from models.stack_interpreter import StackInterpreter, ExecutionStep
 from models.stack_instruction import OpCode
+from views.nav_controls import step_navigator          # ← nuevo
 
 
 # ── Código de ejemplo que se muestra al cargar la vista ──────────────── #
@@ -51,10 +52,10 @@ _EXAMPLES = {
 
 
 class StackInterpreterView:
-    """Vista del intérprete de pila con navegación paso a paso.
+    """Vista del intérprete de pila con navegación enriquecida paso a paso.
 
-    Reutiliza el mismo patrón de navegación por botones (⬅️ / ➡️)
-    que MathView y RegexView, manteniendo consistencia visual.
+    Utiliza el componente step_navigator (nav_controls.py) compartido con
+    MathView y RegexView, manteniendo consistencia visual en las 3 pestañas.
     """
 
     def __init__(self):
@@ -62,13 +63,12 @@ class StackInterpreterView:
         self._compiler    = StackCompiler()
         self._interpreter = StackInterpreter()
 
-        # Estado de sesión propio del módulo (prefijo 'si_' para no colisionar)
         defaults = {
-            "si_steps":       [],     # lista de ExecutionStep
-            "si_step_idx":    0,      # paso actual en la navegación
-            "si_bytecode":    [],     # instrucciones generadas
-            "si_last_source": "",     # cache para detectar cambios
-            "si_error":       None,   # mensaje de error de compilación
+            "si_steps":       [],
+            "si_step_idx":    0,
+            "si_bytecode":    [],
+            "si_last_source": "",
+            "si_error":       None,
         }
         for key, value in defaults.items():
             if key not in st.session_state:
@@ -109,7 +109,6 @@ class StackInterpreterView:
         )
         if st.button("📂 Cargar ejemplo", key="si_load_example"):
             st.session_state["si_source_input"] = _EXAMPLES[example_key]
-            # Reiniciar estado al cargar un ejemplo nuevo
             self._reset_state()
 
     def _render_editor(self) -> None:
@@ -125,8 +124,9 @@ class StackInterpreterView:
 
         col_compile, col_clear = st.columns([2, 1])
         with col_compile:
-            compile_btn = st.button("▶ Compilar y ejecutar", key="si_compile_btn",
-                                    type="primary")
+            compile_btn = st.button(
+                "▶ Compilar y ejecutar", key="si_compile_btn", type="primary"
+            )
         with col_clear:
             if st.button("🗑 Limpiar", key="si_clear_btn"):
                 self._reset_state()
@@ -135,16 +135,14 @@ class StackInterpreterView:
         if compile_btn and source.strip():
             self._compile_and_run(source)
 
-        # Muestra el código intermedio generado
         if st.session_state["si_error"]:
             st.error(f"⚠️ {st.session_state['si_error']}")
-
         elif st.session_state["si_bytecode"]:
             st.subheader("🔢 Código intermedio generado")
             self._render_bytecode_table()
 
     def _render_trace_panel(self) -> None:
-        """Panel derecho: navegación paso a paso, pila y memoria."""
+        """Panel derecho: navegación enriquecida, pila y memoria."""
         steps: list[ExecutionStep] = st.session_state["si_steps"]
 
         if not steps:
@@ -153,28 +151,17 @@ class StackInterpreterView:
 
         st.subheader("⚙️ Traza de ejecución")
 
-        # ── Controles de navegación ──────────────────────────────────── #
         max_idx = len(steps) - 1
-        idx     = st.session_state["si_step_idx"]
 
-        nav_l, nav_info, nav_r = st.columns([1, 3, 1])
-
-        if nav_l.button("⬅️", key="si_prev") and idx > 0:
-            st.session_state["si_step_idx"] -= 1
-            idx -= 1
-
-        if nav_r.button("➡️", key="si_next") and idx < max_idx:
-            st.session_state["si_step_idx"] += 1
-            idx += 1
-
-        nav_info.markdown(
-            f"<div style='text-align:center;padding-top:8px'>"
-            f"Paso <b>{idx + 1}</b> de <b>{max_idx + 1}</b>"
-            f"</div>",
-            unsafe_allow_html=True,
+        # ── Navegación enriquecida (reemplaza los 3 botones) ─────────── #
+        st.session_state["si_step_idx"] = step_navigator(
+            current   = st.session_state["si_step_idx"],
+            max_steps = max_idx,
+            key       = "si",
         )
 
-        current: ExecutionStep = steps[idx]
+        idx     = st.session_state["si_step_idx"]
+        current = steps[idx]
 
         # ── Instrucción actual ───────────────────────────────────────── #
         instr_color = "#ffcccc" if current.error else "#d4edda"
@@ -186,18 +173,15 @@ class StackInterpreterView:
             unsafe_allow_html=True,
         )
 
-        # ── Descripción en lenguaje natural ──────────────────────────── #
         st.caption(current.describe())
 
         if current.error:
             st.error(f"Error en ejecución: {current.error}")
             return
 
-        # ── Visualización de la pila ─────────────────────────────────── #
         st.markdown("**🥞 Estado de la pila** *(tope arriba)*")
         self._render_stack_visual(current.stack_snapshot)
 
-        # ── Memoria de variables ─────────────────────────────────────── #
         st.markdown("**🗄️ Memoria de variables**")
         self._render_memory_table(current.memory_snapshot)
 
@@ -211,16 +195,15 @@ class StackInterpreterView:
         idx      = st.session_state["si_step_idx"]
         steps    = st.session_state["si_steps"]
 
-        # Índice de la instrucción actual en el bytecode
         current_instr_idx = steps[idx].step_num if steps else -1
 
         rows = []
         for i, instr in enumerate(bytecode):
             marker = "▶" if i == current_instr_idx else ""
             rows.append({
-                " ": marker,
-                "#": i,
-                "Opcode":   instr.opcode.name,
+                " ":       marker,
+                "#":       i,
+                "Opcode":  instr.opcode.name,
                 "Operando": str(instr.operand) if instr.operand is not None else "",
             })
 
@@ -239,17 +222,15 @@ class StackInterpreterView:
             )
             return
 
-        # Renderizamos de arriba (tope) hacia abajo (fondo)
         reversed_snap = list(reversed(snapshot))
         html_cells = ""
         for i, val in enumerate(reversed_snap):
-            is_top     = (i == 0)
-            bg_color   = "#1a7a4a" if is_top else "#2e9c6a"
-            text_color = "#ffffff"
-            border     = "3px solid #0d5c37" if is_top else "1px solid #1a7a4a"
-            label      = " ← tope" if is_top else ""
+            is_top   = (i == 0)
+            bg_color = "#1a7a4a" if is_top else "#2e9c6a"
+            border   = "3px solid #0d5c37" if is_top else "1px solid #1a7a4a"
+            label    = " ← tope" if is_top else ""
             html_cells += (
-                f"<div style='background:{bg_color};color:{text_color};"
+                f"<div style='background:{bg_color};color:#ffffff;"
                 f"border:{border};padding:8px 16px;margin:2px 0;"
                 f"border-radius:6px;font-family:monospace;font-size:14px;"
                 f"display:flex;justify-content:space-between'>"
@@ -298,5 +279,6 @@ class StackInterpreterView:
         """Reinicia el estado de ejecución sin tocar el editor."""
         st.session_state["si_steps"]    = []
         st.session_state["si_step_idx"] = 0
+        st.session_state["si_slider"]   = 0   # ← limpiar el slider explícitamente
         st.session_state["si_bytecode"] = []
         st.session_state["si_error"]    = None
